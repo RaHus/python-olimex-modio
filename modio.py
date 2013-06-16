@@ -1,132 +1,4 @@
 """Utility functions and classes to handle olimex mod-io from python.
-
-SETUP
-=====
-
-Before using this code, you need to make sure mod-io is configured and working
-on your system. Assuming you have a debian based system (like ubuntu or
-raspbian):
-
-1) edit /etc/modules, by running 'sudo -s' and opening the file with your
-   favourite editor. Make sure it has the lines:
-
-     # ... random comments ...
-     i2c-dev
-     i2c_bcm2708 baudrate=50000
-
-2) once /etc/modules has been edited, run:
-  
-     $ sudo service kmod start
-
-   to load all the modules. Alternatively, you can reboot your system.
-
-3) make sure debugging tools and libraries are installed:
-
-     $ sudo apt-get install i2c-tools python-smbus 
-
-3) verify that mod-io is accessible, and to which bus it is
-   connected. You need to run
-
-     $ sudo i2cdetect -y X
-
-   with X being 0 or 1. X is the bus number. If you see a 58 (assuming you did
-   not change the default address of mod-io) in the output, you found the right
-   bus. Remember this number for later!
-   
-   If you don't see 58 anywhere, do you see some other number? Did you change
-   mod-io address or firmware? Is it plugged correctly?  Is there a flashing
-   orange led? If not, you may have problems with the firmware, power supply or
-   connection of mod-io.
-
-   Example:
-   
-   Check status of bus 0. There are all dashesh, mod-io is not here.
-
-     $ sudo i2cdetect -y 0
-
-            0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-       00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       70: -- -- -- -- -- -- -- --                         
-
-   Check status of bus 1. You can see mod-io on address 58! Good!
-
-     $ sudo i2cdetect -y 1
-
-            0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-       00:          -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       50: -- -- -- -- -- -- -- -- 58 -- -- -- -- -- -- -- 
-       60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-       70: -- -- -- -- -- -- -- --         
-
-
-HOW TO USE THE LIBRARY
-======================
-
-1) Copy the modio.py file or the whole directory next to
-   your .py script, or somewhere in PYTHONPATH.
-
-2) Import it with 'import modio' or 'from modio import modio'
-   if you left the whole directory.
-
-3) Use it! Examples:
-
-    from modio import modio
-    
-    # BUS Number is the bus you found during setup, see instructions above!
-    board = modio.Device(bus=1)
-    
-    # Take control of the first relay (number 1 on board)
-    relay = modio.Relay(board, 1)
-    
-    # Turn it on!
-    relay.CloseContact()
-    
-    # Check relay status.
-    if relay.IsClosed():
-      print "Relay is on"
-    else:
-      print "Relay is off"
-    
-    # Turn it off!
-    relay.OpenContact()
-
-
-MODIFIED FIRMWARE
-=================
-
-If you have a mod-io and would like some extra features from your
-board you can install a modified firmware available here:
-
-  https://github.com/ccontavalli/olimex-modio-firmware
-
-This firmware allows you to:
-
-  1. Read which extra features the firmware supports :)
-  2. Read the state of relays directly from the board.
-     (thanks to Imran for the patches, https://github.com/emnuu)
-
-
-PROBLEMS, ISSUES, or QUESTIONS?
-===============================
-
-Check out the wiki here:
-  https://github.com/ccontavalli/python-olimex-modio/wiki
-
-File problems, issues or other requests here:
-  https://github.com/ccontavalli/python-olimex-modio/issues
-
-Newer versions of the code are available here:
-  https://github.com/ccontavalli/python-olimex-modio
 """
 
 try:
@@ -213,24 +85,31 @@ class Device(object):
   """Represents a mod-io device, allows to perform common operations."""
 
   # Default address where mod-io can be found on the SMB bus.
-  DEFAULT_ADDRESS = 0x58
+  DEFAULT_ADDRESS = 0x48
   # Bus number, you can use i2c tools to find it.
   DEFAULT_BUS = 1
 
+
+  # Command to set the tristate register
+  SET_TRIS = 0x01 
+
+  # Command to set the latch registers
+  SET_LAT = 0x02  
+
   # Command to use to pilot relays.
-  RELAY_WRITE_COMMAND = 0x10
+  RELAY_WRITE_COMMAND = 0x40
   
   # Command to read digital in status
-  DIGITAL_IN_COMMAND = 0x20
+  DIGITAL_IN_COMMAND = 0x03
   
   # Command to get relay state
-  RELAY_READ_COMMAND = 0x40
+  RELAY_READ_COMMAND = 0x80#not available in default firmware
   
   # Command to change the address of modio
-  CHANGE_ADDRESS_COMMAND = 0xF0
+  CHANGE_ADDRESS_COMMAND = 0xB0
 
-  # Base command to read analog inputs
-  AIN_READ_COMMAND = 0x30
+  # Base command to read analog inputs, starting on AN0
+  AIN_READ_COMMAND = 0x10
 
 
   def __init__(self, address=DEFAULT_ADDRESS, bus=DEFAULT_BUS, communicator=SmbBus):
@@ -264,7 +143,7 @@ class Device(object):
 
     Args:
       ain: integer, the number of the analogic input to read.
-          On mod-io, analg inputs are numbered 1 - 4.
+          On mod-io2, analg inputs are numbered 0 - 7.
 
     Raises:
       ValueError: if an invalid analog input is passed.
@@ -273,9 +152,9 @@ class Device(object):
       integer, the command to use to read the analog input.
     """
     ain = int(ain)
-    if ain < 1 or ain > 4:
+    if ain < 1 or ain > 8:
       raise ValueError("analog input must be between 1 and 4")
-    # There is a different command for each relay.
+    # There is a different command for each analog input.
     return self.AIN_READ_COMMAND + ain - 1
 
   def ReadAin(self, ain):
@@ -283,13 +162,13 @@ class Device(object):
 
     Args:
       ain: integer, the number of the analogic input to read.
-          On mod-io, analg inputs are numbered 1 - 4.
+          On mod-io2, analg inputs are numbered 0 - 7.
 
     Raises:
       ValueError: if an invalid analog input is passed.
 
     Returns:
-      integer, the value of the analog input. Note that mod-io
+      integer, the value of the analog input. Note that mod-io2
       analog inputs have a precision of 10 bits.
     """
     command = self.GetReadAinCommand(ain)
@@ -297,29 +176,29 @@ class Device(object):
     data = self.communicator.ReadBlock(command, 2)
     return data[0] + (data[1] << 8)
      
-  def ReadRelays(self):
-    """Reads the status of the relays from the board, and returns it."""
-    data = self.communicator.ReadBlock(self.RELAY_READ_COMMAND, 2)
-    return data & 0xf
+  #def ReadRelays(self):
+  #  """Reads the status of the relays from the board, and returns it."""
+  #  data = self.communicator.ReadBlock(self.RELAY_READ_COMMAND, 2)
+  #  return data & 0xf
   
-  def ReadRelay(self, relay_out):
-    """Return value for relay 
-
-    Args:
-      relay_out: int, 1 - 4, the relay value to get for.
-        Note that olimex mod-io has exactly 4 relays
-   
-    Raises:
-      ValueError if an invalid relay number is passed.
-   
-    Returns:
-      False if the relay is low, True if high.
-    """
-    bit = self.GetRelayBit(relay_out)
-    status = self.ReadRelays()
-    if status & bit:
-      return True
-    return False
+  #def ReadRelay(self, relay_out):
+  #  """Return value for relay 
+  #
+  #  Args:
+  #    relay_out: int, 1 - 4, the relay value to get for.
+  #      Note that olimex mod-io has exactly 4 relays
+  # 
+  #  Raises:
+  #    ValueError if an invalid relay number is passed.
+  # 
+  #  Returns:
+  #    False if the relay is low, True if high.
+  #  """
+  #  bit = self.GetRelayBit(relay_out)
+  #  status = self.ReadRelays()
+  #  if status & bit:
+  #    return True
+  #  return False
     
   def GetDigitalIns(self):
     """Reads the values of digital in register."""
@@ -356,8 +235,8 @@ class Device(object):
 
   def SetRelays(self, value):
     """Set and return the relay status."""
-    if value < 0 or value > 0xf:
-      raise ValueError("Invalid relay value: can be between 0 and 0xF")
+    if value < 0 or value > 0x04:
+      raise ValueError("Invalid relay value: can be between 0 and 4")
     self.communicator.Write(self.RELAY_WRITE_COMMAND, value)
     self.relay_status = value
     return self.relay_status
@@ -370,14 +249,14 @@ class Device(object):
     representis a closed relay. This value can be written to mod-io to close
     / open all relays.
 
-    This method takes a relay number (eg, 1 - 4) and returns an integer
+    This method takes a relay number (eg, 1 - 2) and returns an integer
     with the bit controlling this relay set to 1. As this method raises
     ValueError if an invalid relay is provided, it can be used to validate
     relay numbers.
 
     Args:
-      relay: int, 1 - 4, the relay to . Note that olimex
-        mod-io has exactly 4 relays.
+      relay: int, 1 - 2, the relay to . Note that olimex
+        mod-io2 has exactly 2 relays.
 
     Returns:
       int, the bit of the relay. For relay 0, 1, for relay 1, 2, and
@@ -386,16 +265,16 @@ class Device(object):
     Raises:
       ValueError, if the relay number is invalid.
     """
-    if relay < 1 or relay > 4:
-      raise ValueError("Invalid relay: must be between 1 and %d", 4)
+    if relay < 1 or relay > 2:
+      raise ValueError("Invalid relay: must be between 1 and %d", 2)
     return 1 << (relay - 1)
 
   def IsRelayClosed(self, relay):
     """Returns the status of a relay.
 
     Args:
-      relay: int, 1 - 4, the relay to enable. Note that olimex
-        mod-io has exactly 4 relays.
+      relay: int, 1 - 2, the relay to enable. Note that olimex
+        mod-io2 has exactly 2 relays.
 
     Raises:
       ValueError if an invalid relay number is passed.
@@ -412,8 +291,8 @@ class Device(object):
     """CloseContact a specific relay.
 
     Args:
-      relay: int, 1 - 4, the relay to enable. Note that olimex
-        mod-io has exactly 4 relays.
+      relay: int, 1 - 2, the relay to enable. Note that olimex
+        mod-io2 has exactly 2 relays.
 
     Raises:
       ValueError if an invalid relay number is passed.
@@ -424,8 +303,8 @@ class Device(object):
     """OpenContact a specific relay.
 
     Args:
-      relay: int, 1 - 4, the relay to enable. Note that olimex
-        mod-io has exactly 4 relays.
+      relay: int, 1 - 2, the relay to enable. Note that olimex
+        mod-io2 has exactly 2 relays.
 
     Raises:
       ValueError if an invalid relay number is passed.
@@ -451,7 +330,7 @@ class Relay(object):
 
     Args:
       device: a Device instance, something like modio.Device().
-      number: int, the number of the relay to control, from 1 to 4.
+      number: int, the number of the relay to control, from 1 to 2.
 
     Raises:
       ValueError, if the number is invalid.

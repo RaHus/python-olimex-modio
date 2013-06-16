@@ -70,8 +70,8 @@ DESCRIPTION
            10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
            20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
            30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-           40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
-           50: -- -- -- -- -- -- -- -- 58 -- -- -- -- -- -- -- 
+           40: -- -- -- -- -- -- -- -- 48 -- -- -- -- -- -- -- 
+           50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
            60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
            70: -- -- -- -- -- -- -- --         
     
@@ -87,7 +87,7 @@ DESCRIPTION
     
     3) Use it! Examples:
     
-        from modio import modio
+        from modio2 import modio
         
         # BUS Number is the bus you found during setup, see instructions above!
         board = modio.Device(bus=1)
@@ -108,33 +108,6 @@ DESCRIPTION
         relay.OpenContact()
     
     
-    MODIFIED FIRMWARE
-    =================
-    
-    If you have a mod-io and would like some extra features from your
-    board you can install a modified firmware available here:
-    
-      https://github.com/ccontavalli/olimex-modio-firmware
-    
-    This firmware allows you to:
-    
-      1. Read which extra features the firmware supports :)
-      2. Read the state of relays directly from the board.
-         (thanks to Imran for the patches, https://github.com/emnuu)
-    
-    
-    PROBLEMS, ISSUES, or QUESTIONS?
-    ===============================
-    
-    Check out the wiki here:
-      https://github.com/ccontavalli/python-olimex-modio/wiki
-    
-    File problems, issues or other requests here:
-      https://github.com/ccontavalli/python-olimex-modio/issues
-    
-    Newer versions of the code are available here:
-      https://github.com/ccontavalli/python-olimex-modio
-
 CLASSES
     __builtin__.object
         Device
@@ -628,6 +601,6 @@ FUNCTIONS
         
           # Read the first analog input.
           modio.py read-ain 1
-          57
+          
 
 
